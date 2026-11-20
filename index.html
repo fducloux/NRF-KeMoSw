@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8REC-KM</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --ink: #1b1f27; --muted: #667085; --line: #e1e4ea;
+  --accent: #2563eb; --accent-ink: #ffffff; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+  --chip: #eef1f6;
+  --led1: #d63a3a; --led2: #2c6fd6; --led3: #2a9d5c;   /* the hub's lights: red = computer 1, blue = computer 2, green = pairing */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101318; --card: #1a1f27; --ink: #e8ebf0; --muted: #98a2b3; --line: #2b323d;
+    --accent: #5b8def; --accent-ink: #0b1220; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    --chip: #232a35;
+    --led1: #ff6b6b; --led2: #6aa6ff; --led3: #4cd68a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 20px; margin: 0 0 2px; }
+.sub { color: var(--muted); margin: 0 0 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 0 0 12px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.name { font-weight: 600; font-size: 16px; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--chip); color: var(--muted); font-size: 12.5px; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+.grip { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; padding: 2px 10px 2px 0; color: var(--muted); font-size: 18px; line-height: 1; }
+.num { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px; background: var(--hc, var(--accent)); color: #fff; font-weight: 700; font-size: 13px; margin-right: 8px; }
+.card.dragging { opacity: .55; }
+.card.dropbefore { box-shadow: 0 -3px 0 0 var(--accent); }
+.card.dropafter { box-shadow: 0 3px 0 0 var(--accent); }
+.led { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; background: var(--hc, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hc, var(--accent)) 22%, transparent); }
+.active { outline: 2px solid var(--hc, var(--accent)); }
+.badge { background: var(--hc, var(--accent)); color: var(--accent-ink); font-size: 12px; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
+button, select, input[type=text] {
+  font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px; min-height: 36px;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--hc, var(--accent)); color: var(--accent-ink); border-color: var(--hc, var(--accent)); font-weight: 600; }
+.hint .led { --hc: var(--led3); }
+button.danger { color: var(--bad); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+label.sw { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+#msg { min-height: 20px; color: var(--muted); font-size: 13px; margin: 6px 2px 0; }
+#msg.err { color: var(--bad); }
+h2 { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 22px 2px 8px; font-weight: 600; }
+.hidden { display: none; }
+.bigcode { font: 700 44px/1.1 ui-monospace, Menlo, monospace; letter-spacing: .12em; text-align: center; margin: 14px 0 4px; font-variant-numeric: tabular-nums; }
+#wizard p { margin: 0 0 6px; }
+input[type=text] { width: 9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>8REC-KM</h1>
+  <p class="sub">Settings for your keyboard and mouse switch.</p>
+
+  <div id="unsupported" class="card hidden">
+    <b>This browser cannot talk to Bluetooth devices.</b>
+    <div class="hint" style="margin-top:6px"><b>iPhone or iPad:</b> every browser there (Safari and Chrome too) lacks Web Bluetooth.
+      Install the free <a href="https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener">Bluefy browser</a>
+      and open this page in it.<br><b>Android, Windows, Mac:</b> use Chrome or Edge.</div>
+  </div>
+
+  <div class="card" id="connectCard">
+    <div class="row">
+      <div class="grow">
+        <div class="name" id="connName">Settings not opened yet</div>
+        <div class="hint" id="connHint">Press Connect and pick “8REC-KM” in the list. This opens the hub’s settings. Your keyboard and mouse keep working either way.</div>
+      </div>
+      <button class="primary" id="connectBtn">Connect</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="wizard" class="card hidden"></div>
+  <div id="phoneCard" class="card hidden">
+    <div class="row">
+      <div class="grow"><div class="name">Phone link is open</div>
+      <div class="hint">Anyone nearby can change settings until you close it. It closes by itself after a few minutes. To open it again later, hold Ctrl + Shift on the keyboard and type 8REC.</div></div>
+    </div>
+    <div class="actions"><button class="primary" id="closeSetup">Disconnect phone</button><button id="runSetup">Run setup again</button></div>
+  </div>
+  <div id="panel" class="hidden">
+    <h2>Computers</h2>
+    <div id="hosts"></div>
+    <div class="actions" id="addRow"><button id="addHost">Add computer</button></div>
+
+    <h2>Keyboard and mouse</h2>
+    <div class="card">
+      <div class="row"><span class="grow">MX Keys (keyboard)</span><span class="chip" id="kbd">-</span></div>
+      <div class="row" style="margin-top:8px"><span class="grow">MX Master (mouse)</span><span class="chip" id="mouse">-</span></div>
+      <div class="actions"><button id="pairMx">Pair keyboard or mouse…</button></div>
+      <div class="hint" id="pairMxHint">Put the MX device in pairing mode (hold its Easy-Switch button about 3 seconds). The keyboard asks for the code 123456.</div>
+    </div>
+
+    <h2>Shortcuts</h2>
+    <div class="card">
+      <div class="hint" style="margin:0 0 12px">Ctrl + Shift + Left Arrow switches to computer 1, Ctrl + Shift + Right Arrow to computer 2.</div>
+      <div class="row"><span class="grow">Switch computer: hold Ctrl + Shift and click mouse button <strong id="swb">-</strong></span><button id="learnSw">Learn…</button></div>
+      <div class="row" style="margin-top:10px"><span class="grow">No-sleep on or off for the active computer: hold Ctrl + Shift and click mouse button <strong id="nsb">-</strong></span><button id="learnNs">Learn…</button></div>
+      <div class="hint" id="learnHint"></div>
+      <div class="hint">No-sleep sends a tiny invisible key tap every 30 seconds so the computer never goes to sleep. On the hub, a red light stays on while computer 1 is selected and a blue light while computer 2 is selected. With no-sleep on, the selected computer's light dips off briefly every 2 seconds, and an unselected computer's light flashes on briefly. The green light shows pairing: it blinks fast while the hub is scanning, slowly while it waits for you to type a code, and is off when pairing is done.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SVC = "5a6f0001-6b76-4d48-8f2e-7d9c1b2a3c4d";
+const CH_STATE = "5a6f0002-6b76-4d48-8f2e-7d9c1b2a3c4d";
+const CH_CMD = "5a6f0003-6b76-4d48-8f2e-7d9c1b2a3c4d";
+const $ = (id) => document.getElementById(id);
+let device = null, server = null, chState = null, chCmd = null, timer = null, state = null, busy = false;
+let extraHosts = 2;                  // computer cards shown (the Add computer button raises it up to four)
+const pairUntil = [0, 0, 0, 0];            // when each computer's pairing window ends (ms)
+let pairMxUntil = 0;
+
+if (!navigator.bluetooth) { $("unsupported").classList.remove("hidden"); $("connectBtn").disabled = true; }
+
+function say(text, isErr) { const m = $("msg"); m.textContent = text || ""; m.className = isErr ? "err" : ""; }
+
+// Drag a computer card by its handle to a new place (mouse or touch); the cards renumber themselves 1, 2, 3, 4.
+let drag = null;
+function visibleCards() { return [...$("hosts").children].filter((c) => !c.classList.contains("hidden")); }
+function dropIndex(y) {
+  const cards = visibleCards();
+  let idx = cards.length - 1;
+  for (let k = 0; k < cards.length; k++) { const r = cards[k].getBoundingClientRect(); if (y < r.top + r.height / 2) { idx = k; break; } }
+  return idx;
+}
+function attachDrag(card, i) {
+  const grip = card.querySelector(".grip");
+  grip.addEventListener("pointerdown", (e) => {
+    drag = { from: i, to: i };
+    card.classList.add("dragging");
+    grip.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  grip.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    drag.to = dropIndex(e.clientY);
+    visibleCards().forEach((c, k) => {
+      c.classList.toggle("dropbefore", drag.to < drag.from && k === drag.to);
+      c.classList.toggle("dropafter", drag.to > drag.from && k === drag.to);
+    });
+  });
+  const end = async () => {
+    if (!drag) return;
+    const { from, to } = drag; drag = null;
+    visibleCards().forEach((c) => c.classList.remove("dragging", "dropbefore", "dropafter"));
+    if (from === to) return;
+    // the dragged computer trades places with its neighbour, step by step, until it is where it was dropped
+    if (to > from) for (let k = from; k < to; k++) await send("pos " + (k + 1) + " " + (k + 2));
+    else for (let k = from; k > to; k--) await send("pos " + (k + 1) + " " + k);
+  };
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
+}
+
+async function send(cmd) {
+  if (!chCmd) return;
+  const data = new TextEncoder().encode(cmd);
+  try {
+    if (chCmd.writeValueWithResponse) await chCmd.writeValueWithResponse(data); else await chCmd.writeValue(data);
+  } catch (e) { say("Could not send the command: " + e.message, true); }
+  setTimeout(poll, 300);
+}
+
+async function poll() {
+  if (!chState || busy) return;
+  busy = true;
+  try {
+    const v = await chState.readValue();
+    state = JSON.parse(new TextDecoder().decode(v));
+    render();
+    say("");
+  } catch (e) { say("Reading the hub failed: " + e.message, true); }
+  busy = false;
+}
+
+function chip(el, text, cls) { el.textContent = text; el.className = "chip " + (cls || ""); }
+
+const STEPS = [
+  { t: "Link the keyboard", code: true, d: "Hold the Easy-Switch button on your MX Keys for 3 seconds until its light blinks fast. When it connects, type this code on the keyboard and press Enter:", ok: (st) => st.kbd, okText: "Keyboard linked" },
+  { t: "Link the mouse", d: "Hold the Easy-Switch button on your MX Master for 3 seconds until its light blinks fast. No code is needed.", ok: (st) => st.mouse, okText: "Mouse linked" },
+  { t: "Connect computer 1", d: "On computer 1, open the Bluetooth settings, remove any old “8REC-KM” or “KVM CMP2” entry, and add “8REC-KM”. No code is needed.", ok: (st) => st.h[0].on, okText: "Computer 1 connected" },
+  { t: "Connect computer 2", d: "Do the same on computer 2: remove any old entry and add “8REC-KM”. No code is needed.", ok: (st) => st.h[1].on, okText: "Computer 2 connected" },
+];
+
+function renderWizard() {
+  const st = state, i = st.step, sp = STEPS[i], w = $("wizard");
+  const code = sp.code && st.code ? '<div class="bigcode" aria-label="code to type">' + String(st.code).padStart(6, "0") + "</div>" : "";
+  w.innerHTML = '<div class="hint" style="margin:0">Step ' + (i + 1) + " of 4</div>" +
+    '<div class="name" style="font-size:20px;margin:2px 0 8px">' + sp.t + "</div>" +
+    "<p>" + sp.d + "</p>" + code +
+    '<div class="row" style="margin-top:12px"><span class="chip ' + (sp.ok(st) ? "ok" : "warn") + '">' + (sp.ok(st) ? "✓ " + sp.okText : "waiting…") + "</span></div>" +
+    '<div class="actions"><button id="skipStep">Skip this step</button></div>';
+  $("skipStep").onclick = () => send("setup 2");
+}
+
+function render() {
+  if (!state) return;
+  const wiz = !!(state.setup && state.step < 4);
+  $("wizard").classList.toggle("hidden", !wiz);
+  $("phoneCard").classList.toggle("hidden", !state.setup || wiz);
+  if (wiz) { $("panel").classList.add("hidden"); renderWizard(); return; }
+  $("panel").classList.remove("hidden");
+  chip($("kbd"), state.kbd ? "connected" : "not connected", state.kbd ? "ok" : "warn");
+  chip($("mouse"), state.mouse ? "connected" : "not connected", state.mouse ? "ok" : "warn");
+  $("swb").textContent = state.sw ? state.sw : "not set";
+  $("nsb").textContent = state.nsb ? state.nsb : "not set";
+  $("learnHint").textContent = state.learn ? "Now press the mouse button you want to use as the " + (state.learn === 1 ? "switch" : "no-sleep") + " button (15 seconds)." : "";
+  $("learnSw").disabled = $("learnNs").disabled = !!state.learn;
+  const now = Date.now();
+  if (state.pair) pairUntil[state.pair - 1] = pairUntil[state.pair - 1] > now ? pairUntil[state.pair - 1] : now + 120000;
+  else pairUntil.fill(0);
+  if (state.pairmx) pairMxUntil = pairMxUntil > now ? pairMxUntil : now + 60000; else pairMxUntil = 0;
+  $("pairMx").disabled = !!state.pairmx;
+  $("addHost").onclick = () => { extraHosts = Math.min(state.h.length, extraHosts + 1); render(); };
+  $("pairMx").textContent = state.pairmx ? "Pairing… (" + Math.max(0, Math.round((pairMxUntil - now) / 1000)) + " s)" : "Pair keyboard or mouse…";
+
+  const box = $("hosts");
+  if (!box.children.length) {
+    state.h.forEach((_, i) => {
+      const c = document.createElement("div");
+      c.className = "card"; c.id = "host" + i;
+      c.style.setProperty("--hc", i === 0 ? "var(--led1)" : i === 1 ? "var(--led2)" : "#9b59d0");   // the hub's lights: red = 1, blue = 2, both = 3 (and 4, blinking)
+      c.innerHTML =
+        '<div class="row"><div class="grow"><span class="grip" title="Drag to change the order">&#8942;&#8942;</span><span class="num"></span><span class="name"></span> <span class="badge hidden">in use</span> <span class="pos"></span></div><span class="chip"></span></div>' +
+        '<div class="row" style="margin-top:10px"><label class="sw"><input type="checkbox" class="swap"> Swap Alt and Command (for a Mac)</label></div>' +
+        '<div class="row" style="margin-top:6px"><label class="sw"><input type="checkbox" class="nos"> Keep awake (no-sleep)</label></div>' +
+        '<div class="row" style="margin-top:10px"><span class="grow">Mouse: space between reports</span><select class="mgap">' +
+        '<option value="0">0 ms (fastest)</option><option value="8">8 ms (default)</option><option value="15">15 ms</option><option value="22">22 ms</option></select></div>' +
+        '<div class="row" style="margin-top:6px"><label class="sw"><input type="checkbox" class="meven"> Mouse: even out big steps</label></div>' +
+        '<div class="actions">' +
+        '<button class="use primary">Use this computer</button>' +
+
+        '<button class="pair">Pair…</button>' +
+        '<button class="rename">Rename</button>' +
+        '<button class="forget danger">Forget</button></div>' +
+        '<div class="hint pairhint hidden"></div>';
+      box.appendChild(c);
+      c.querySelector(".use").onclick = () => send("switch " + (i + 1));
+      attachDrag(c, i);
+      c.querySelector(".pair").onclick = () => { pairUntil[i] = Date.now() + 120000; send("pair " + (i + 1)); };
+      c.querySelector(".swap").onchange = (e) => send("swap " + (i + 1) + " " + (e.target.checked ? 1 : 0));
+      c.querySelector(".mgap").onchange = (e) => send("mgap " + (i + 1) + " " + e.target.value);
+      c.querySelector(".meven").onchange = (e) => send("meven " + (i + 1) + " " + (e.target.checked ? 1 : 0));
+      c.querySelector(".nos").onchange = (e) => send("nosleep " + (i + 1) + " " + (e.target.checked ? 1 : 0));
+      c.querySelector(".rename").onclick = () => {
+        const n = prompt("Name for this computer (leave empty to use its own Bluetooth name)", state.h[i].n);
+        if (n !== null) send("name " + (i + 1) + " " + n.trim().slice(0, 15));
+      };
+      c.querySelector(".forget").onclick = () => {
+        if (confirm("Forget " + state.h[i].n + "? It has to be paired again to use the hub.")) send("forget " + (i + 1));
+      };
+    });
+  }
+  let shown = Math.max(2, extraHosts);
+  state.h.forEach((h, i) => { if (h.known || h.on) shown = Math.max(shown, i + 1); });
+  extraHosts = shown;
+  $("addRow").classList.toggle("hidden", shown >= state.h.length);
+  const place = ["left-most", "middle 1", "middle 2", "right-most"];
+  state.h.forEach((h, i) => {
+    const c = $("host" + i), isActive = state.active === i;
+    c.classList.toggle("hidden", i >= shown);
+    c.querySelector(".pos").textContent = "· " + (i === 0 ? place[0] : i === shown - 1 ? place[3] : shown === 3 ? "middle" : place[i]);
+    c.querySelector(".num").textContent = String(i + 1);
+    c.querySelector(".grip").classList.toggle("hidden", shown < 2);
+    c.classList.toggle("active", isActive);
+    c.querySelector(".name").textContent = h.n;
+    c.querySelector(".badge").classList.toggle("hidden", !isActive);
+    chip(c.querySelector(".chip"), h.on ? "connected" : h.known ? "paired, not connected" : "not paired", h.on ? "ok" : h.known ? "warn" : "bad");
+    c.querySelector(".swap").checked = !!h.swap;
+    c.querySelector(".nos").checked = !!h.nos;
+    if (document.activeElement !== c.querySelector(".mgap")) c.querySelector(".mgap").value = String(h.g);
+    c.querySelector(".meven").checked = !!h.e;
+    c.querySelector(".use").disabled = isActive || !h.on;
+    const open = state.pair === i + 1;
+    c.querySelector(".pair").textContent = h.known ? "Pair again…" : "Pair…";
+    c.querySelector(".pair").disabled = open;
+    c.querySelector(".forget").disabled = !h.known;
+    const hint = c.querySelector(".pairhint");
+    hint.classList.toggle("hidden", !open);
+    if (open) hint.innerHTML = '<span class="led"></span>' + "Pairing is open for " + Math.max(0, Math.round((pairUntil[i] - now) / 1000)) + " s. On that computer, open Bluetooth settings, forget any old “8REC-KM” and add “8REC-KM” again.";
+  });
+}
+
+$("learnSw").onclick = () => send("learn 1");
+let userClosed = false;
+$("closeSetup").onclick = () => { userClosed = true; send("setup 0"); };
+$("runSetup").onclick = () => send("setup 1");
+$("learnNs").onclick = () => send("learn 2");
+$("pairMx").onclick = () => { pairMxUntil = Date.now() + 60000; send("pairmx"); };
+
+async function open() {
+  server = await device.gatt.connect();
+  const svc = await server.getPrimaryService(SVC);
+  chState = await svc.getCharacteristic(CH_STATE);
+  chCmd = await svc.getCharacteristic(CH_CMD);
+  $("connName").textContent = "Settings open on " + (device.name || "8REC-KM");
+  $("connHint").textContent = "Changes apply at once and are saved on the hub.";
+  $("connectBtn").textContent = "Disconnect";
+  clearInterval(timer);
+  await poll();
+  timer = setInterval(poll, 1500);
+}
+
+function closed() {
+  clearInterval(timer); chState = chCmd = null; state = null;
+  $("panel").classList.add("hidden"); $("hosts").innerHTML = "";
+  $("connName").textContent = "Settings not opened yet";
+  $("connHint").textContent = "Press Connect and pick “8REC-KM” in the list. This opens the hub’s settings. Your keyboard and mouse keep working either way.";
+  $("connectBtn").textContent = "Connect";
+}
+
+async function reconnect() {          // the link drops briefly when the hub switches computers
+  for (let i = 0; i < 5 && device; i++) {
+    try { say("Reconnecting…"); await open(); say(""); return; } catch (e) { await new Promise((r) => setTimeout(r, 1500)); }
+  }
+  closed(); say("The connection was lost. Press Connect to try again.", true);
+}
+
+$("connectBtn").onclick = async () => {
+  if (device && device.gatt.connected) { const d = device; device = null; d.gatt.disconnect(); closed(); return; }
+  try {
+    say("");
+    // A phone has no link to the hub yet and connects through the hub's setup advertisement, which carries the setup service:
+  // filter on that, so only that entry is listed (phones cache the name and would show two devices called 8REC-KM).
+  // A computer that is already paired finds the hub by name.
+  const phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  device = await navigator.bluetooth.requestDevice({ filters: phone ? [{ services: [SVC] }] : [{ namePrefix: "8REC" }, { namePrefix: "KVM" }], optionalServices: [SVC] });
+    device.addEventListener("gattserverdisconnected", () => { if (userClosed) { userClosed = false; const d = device; device = null; closed(); say("Setup is closed and the phone is disconnected. To open it again, hold Ctrl + Shift on the keyboard and type 8REC."); return; } if (device) reconnect(); });
+    await open();
+  } catch (e) {
+    if (e.name === "NotFoundError" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !device) say("No setup device in range. Open setup first: tap the phone on the NFC coil (green LED steady), or power-cycle the hub, or hold Ctrl+Shift on the keyboard and type 8REC.");
+    else if (e.name !== "NotFoundError") say("Could not connect (" + (e.name || "error") + (e.message ? ": " + e.message : "") + "). Open setup first: tap the phone on the NFC coil (green LED steady) or hold Ctrl+Shift and type 8REC, then pick “8REC-KM setup”.", true);
+    if (!(device && device.gatt.connected)) closed();
+  }
+};
+// After a reload Chrome can remember the permission (getDevices): reconnect without the chooser when it does.
+(async () => {
+  if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+  try {
+    const list = await navigator.bluetooth.getDevices();
+    const d = list.find((x) => ((x.name || "").startsWith("8REC") || (x.name || "").startsWith("KVM")));
+    if (!d) return;
+    device = d;
+    device.addEventListener("gattserverdisconnected", () => { if (device) reconnect(); });
+    say("Reconnecting to " + (d.name || "the hub") + "…");
+    await open();
+    say("");
+  } catch (e) {
+    device = null; closed();
+    say("Press Connect to open the settings.");
+  }
+})();
+</script>
+</body>
+</html>
